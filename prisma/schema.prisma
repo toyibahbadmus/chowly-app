@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Restaurant {
+  restaurantId    String          @id @map("restaurant_id")
+  restaurantName  String          @map("restaurant_name")
+  location        String
+  contactNumber   String          @map("contact_number")
+  tables          Table[]
+  menus           Menu[]
+  staff           Staff[]
+  staffShifts     StaffShift[]
+  diningSessions  DiningSession[]
+
+  @@map("restaurant")
+}
+
+model Customer {
+  customerId     String          @id @map("customer_id")
+  customerName   String          @map("customer_name")
+  email          String          @unique
+  diningSessions DiningSession[]
+
+  @@map("customer")
+}
+
+model Table {
+  tableId        String          @id @map("table_id")
+  restaurantId   String          @map("restaurant_id")
+  tableNumber    String          @map("table_number")
+  capacity       Int
+  tableStatus    String          @map("table_status")
+  restaurant     Restaurant      @relation(fields: [restaurantId], references: [restaurantId])
+  diningSessions DiningSession[]
+
+  @@map("table")
+}
+
+model DiningSession {
+  sessionId     String     @id @map("session_id")
+  customerId    String     @map("customer_id")
+  restaurantId  String     @map("restaurant_id")
+  tableId       String     @map("table_id")
+  checkInTime   String     @map("check_in_time")
+  checkOutTime  String?    @map("check_out_time")
+  customer      Customer   @relation(fields: [customerId], references: [customerId])
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [restaurantId])
+  table         Table      @relation(fields: [tableId], references: [tableId])
+  orders        Order[]
+
+  @@map("dining_session")
+}
+
+model Menu {
+  menuId              String      @id @map("menu_id")
+  restaurantId        String      @map("restaurant_id")
+  itemName            String      @map("item_name")
+  itemType            String      @map("item_type")
+  price               Float
+  estimatedPrepTime   Int         @map("estimated_prep_time")
+  isAvailable         Boolean     @map("is_available")
+  restaurant          Restaurant  @relation(fields: [restaurantId], references: [restaurantId])
+  orderItems          OrderItem[]
+
+  @@map("menu")
+}
+
+model Order {
+  orderId             String         @id @map("order_id")
+  sessionId           String         @map("session_id")
+  staffId             String?        @map("staff_id")
+  orderTime           String         @map("order_time")
+  totalExpectedWait   Int            @map("total_expected_wait")
+  overallStatus       String         @map("overall_status")
+  diningSession       DiningSession  @relation(fields: [sessionId], references: [sessionId])
+  staff               Staff?         @relation(fields: [staffId], references: [staffId])
+  orderItems          OrderItem[]
+  complaints          Complaint[]
+  payments            Payment[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  orderItemId            String                 @id @map("order_item_id")
+  orderId                String                 @map("order_id")
+  menuId                 String                 @map("menu_id")
+  quantity               Int
+  unitPriceAtOrder       Float                  @map("unit_price_at_order")
+  itemPreparationStatus  String                 @map("item_preparation_status")
+  maxPrepTime            Int                    @map("max_prep_time")
+  order                  Order                  @relation(fields: [orderId], references: [orderId])
+  menu                   Menu                   @relation(fields: [menuId], references: [menuId])
+  modifiers              OrderItemModifier[]
+  assignments            OrderAssignment[]
+
+  @@map("order_items")
+}
+
+model OrderItemModifier {
+  modifierId              String     @id @map("modifier_id")
+  orderItemId             String     @map("order_item_id")
+  modifierName            String     @map("modifier_name")
+  extraCharge             Float      @map("extra_charge")
+  specialInstructionText  String     @map("special_instruction_text")
+  orderItem               OrderItem  @relation(fields: [orderItemId], references: [orderItemId])
+
+  @@map("order_item_modifiers")
+}
+
+model Staff {
+  staffId        String       @id @map("staff_id")
+  restaurantId   String       @map("restaurant_id")
+  staffName      String       @map("staff_name")
+  staffRole      String       @map("staff_role")
+  isActive       Boolean      @map("is_active")
+  restaurant     Restaurant   @relation(fields: [restaurantId], references: [restaurantId])
+  staffShifts    StaffShift[]
+  orders         Order[]
+
+  @@map("staff")
+}
+
+model StaffShift {
+  shiftId              String            @id @map("shift_id")
+  restaurantId         String            @map("restaurant_id")
+  staffId              String            @map("staff_id")
+  clockInTime          String            @map("clock_in_time")
+  clockOutTime         String?           @map("clock_out_time")
+  restaurant           Restaurant        @relation(fields: [restaurantId], references: [restaurantId])
+  staff                Staff             @relation(fields: [staffId], references: [staffId])
+  chefAssignments      OrderAssignment[] @relation("ChefShift")
+  bartenderAssignments OrderAssignment[] @relation("BartenderShift")
+
+  @@map("staff_shifts")
+}
+
+model OrderAssignment {
+  assignmentId       String      @id @map("assignment_id")
+  orderItemId        String      @map("order_item_id")
+  chefShiftId        String?     @map("chef_shift_id")
+  bartenderShiftId   String?     @map("bartender_shift_id")
+  updateTime         String      @map("update_time")
+  orderItem          OrderItem   @relation(fields: [orderItemId], references: [orderItemId])
+  chefShift          StaffShift? @relation("ChefShift", fields: [chefShiftId], references: [shiftId])
+  bartenderShift     StaffShift? @relation("BartenderShift", fields: [bartenderShiftId], references: [shiftId])
+
+  @@map("order_assignment")
+}
+
+model Complaint {
+  complaintId       String   @id @map("complaint_id")
+  orderId           String   @map("order_id")
+  complaintDetails  String   @map("complaint_details")
+  customerRating    Int      @map("customer_rating")
+  submissionTime    String   @map("submission_time")
+  order             Order    @relation(fields: [orderId], references: [orderId])
+
+  @@map("complaint")
+}
+
+model Payment {
+  paymentId          String   @id @map("payment_id")
+  orderId            String   @map("order_id")
+  totalAmountPaid    Float    @map("total_amount_paid")
+  paymentMethod      String   @map("payment_method")
+  paymentTime        String   @map("payment_time")
+  paymentStatus      String   @map("payment_status")
+  order              Order    @relation(fields: [orderId], references: [orderId])
+
+  @@map("payment")
+}
