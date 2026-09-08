@@ -1,100 +1,88 @@
-'use client';
-
-import { useState } from 'react';
 import Link from 'next/link';
-import { Utensils, QrCode, ArrowRight, ShieldCheck, MapPin, Users } from 'lucide-react';
+import { Utensils, Users, ArrowRight, ShieldCheck } from 'lucide-react';
+import { getRestaurantInfoAction } from '@/app/actions';
 
-export default function WelcomePage() {
-  const [selectedTable, setSelectedTable] = useState('TBL001');
+export default async function HomePage() {
+  const info = await getRestaurantInfoAction();
 
-  // Available tables matching our database setup
-  const availableTables = [
-    { id: 'TBL001', number: 'Table 04', capacity: '4 Seats (Ikeja)' },
-    { id: 'TBL003', number: 'Table 07', capacity: '4 Seats (Ikeja)' },
-    { id: 'TBL002', number: 'Table 12', capacity: '6 Seats (Victoria Island)' },
+  // Unique session identifier generator for database tracking
+  const sessionId = `SES${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const tables = [
+    { id: 'TBL001', name: 'Table 01 (Window View)', capacity: 4 },
+    { id: 'TBL002', name: 'Table 02 (Center Booth)', capacity: 6 },
+    { id: 'TBL003', name: 'Table 03 (Patio Outdoor)', capacity: 2 },
+    { id: 'TBL004', name: 'VIP Lounge Table', capacity: 8 },
   ];
 
   return (
-    <main className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
-      
-      {/* Background Ambience / Scenery Gradient Glow */}
-      <div className="absolute inset-0 opacity-25 bg-[radial-gradient(circle_at_top,_var(--tw-gradient-stops))] from-emerald-500 via-slate-900 to-slate-950 pointer-events-none" />
-
-      <div className="max-w-lg w-full bg-slate-900/90 backdrop-blur-md rounded-3xl shadow-2xl border border-slate-800 p-8 text-center space-y-6 relative z-10">
-        
-        {/* Brand Icon Badge */}
-        <div className="mx-auto w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 shadow-inner">
-          <Utensils className="w-8 h-8" />
+    <div className="min-h-screen bg-slate-50 pb-20">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Chowly</h1>
+          <p className="text-xs text-emerald-600 font-medium">{info.branchName}</p>
         </div>
+        <Link
+          href="/waiter"
+          className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
+        >
+          <Users className="w-3.5 h-3.5 text-emerald-600" /> Waiter Dashboard
+        </Link>
+      </header>
 
-        {/* Header Info */}
-        <div className="space-y-2">
-          <div className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold px-3 py-1 rounded-full uppercase tracking-wider">
-            <MapPin className="w-3.5 h-3.5" /> Ocean Basket • Fine Dining Experience
+      {/* Main Container */}
+      <main className="max-w-xl mx-auto p-4 sm:p-6 space-y-6">
+        
+        {/* Status Banner */}
+        <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-3 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <span className="text-xs uppercase tracking-wider text-emerald-200 font-semibold">System Status</span>
+            <span className="text-xs bg-emerald-500/40 px-2.5 py-1 rounded-full text-white">{info.status}</span>
           </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">Welcome to Chowly</h1>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Immerse yourself in our exquisite dining atmosphere. Select your table number below to explore our fresh menu, submit orders, and track live kitchen preparation.
+          <h2 className="text-2xl font-extrabold tracking-tight">Welcome to Chowly Dine-In</h2>
+          <p className="text-xs text-emerald-100">
+            Select your dining table below to initialize a persistent PostgreSQL session and access the live menu.
           </p>
         </div>
 
-        {/* Scenery Preview Frame */}
-        <div className="relative h-36 rounded-2xl overflow-hidden border border-slate-700/60 shadow-inner flex items-center justify-center bg-gradient-to-r from-emerald-950 via-slate-900 to-amber-950">
-          <div className="absolute inset-0 bg-black/40" />
-          <div className="relative z-10 space-y-1 p-4 text-center">
-            <span className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold">Atmosphere & Ambiance</span>
-            <p className="text-xs font-medium text-slate-200 italic">"Warm lighting, premium seating, and coastal elegance."</p>
+        {/* Table Selection */}
+        <div className="restaurant-card p-6 bg-white space-y-4 shadow-sm rounded-2xl border border-slate-100">
+          <div className="space-y-1 border-b border-slate-100 pb-3">
+            <h3 className="font-bold text-slate-900 text-base">Select Your Table</h3>
+            <p className="text-xs text-slate-500">Choose where you are seated to link your order session.</p>
           </div>
-        </div>
 
-        {/* Table Selection Section */}
-        <div className="space-y-3 text-left">
-          <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider text-center">
-            Choose Your Dining Table Number
-          </label>
-          <div className="grid grid-cols-3 gap-2">
-            {availableTables.map((tbl) => (
-              <button
-                key={tbl.id}
-                type="button"
-                onClick={() => setSelectedTable(tbl.id)}
-                className={`p-3 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5 ${
-                  selectedTable === tbl.id
-                    ? 'border-emerald-500 bg-emerald-500/10 text-white font-bold ring-2 ring-emerald-500/20'
-                    : 'border-slate-800 bg-slate-800/50 hover:bg-slate-800 text-slate-400 font-medium'
-                }`}
+          <div className="space-y-3">
+            {tables.map((table) => (
+              <Link
+                key={table.id}
+                href={`/menu?table=${table.id}&session=${sessionId}`}
+                className="flex items-center justify-between p-4 bg-slate-50 hover:bg-emerald-50/50 rounded-xl border border-slate-200 hover:border-emerald-300 transition-all group cursor-pointer"
               >
-                <span className="text-xs text-emerald-400 flex items-center gap-1">
-                  <Users className="w-3 h-3" /> {tbl.number}
-                </span>
-                <span className="text-[10px] text-slate-500">{tbl.capacity.split(' ')[0]} Seats</span>
-              </button>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-emerald-600 font-bold text-sm shadow-sm group-hover:border-emerald-500">
+                    {table.id.replace('TBL', 'T')}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-sm group-hover:text-emerald-900">{table.name}</h4>
+                    <p className="text-xs text-slate-500">Capacity: {table.capacity} Guests • Database Linked</p>
+                  </div>
+                </div>
+
+                <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-600 transition-all shadow-sm">
+                  <ArrowRight className="w-4 h-4" />
+                </div>
+              </Link>
             ))}
           </div>
         </div>
 
-        {/* Action Button */}
-        <div className="pt-2">
-          <Link
-            href={`/menu?table=${selectedTable}&session=SES001`}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-3.5 px-4 rounded-xl shadow-lg shadow-emerald-900/40 transition-all duration-200 text-sm cursor-pointer"
-          >
-            <span>Start Dining at {selectedTable === 'TBL002' ? 'Table 12' : selectedTable === 'TBL003' ? 'Table 07' : 'Table 04'}</span>
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-500 pt-3">
-            <ShieldCheck className="w-4 h-4 text-emerald-500" />
-            <span>Secure Real-Time Table Session</span>
-          </div>
+        <div className="text-center text-xs text-slate-400 pt-2">
+          Powered by Next.js App Router & PostgreSQL Database
         </div>
 
-      </div>
-
-      {/* Footer Waiter Role Switch Hint */}
-      <footer className="mt-6 text-center text-xs text-slate-500 relative z-10">
-        Staff member? Access the <Link href="/waiter" className="text-emerald-400 underline font-medium hover:text-emerald-300">Waiter Dashboard</Link>
-      </footer>
-    </main>
+      </main>
+    </div>
   );
 }

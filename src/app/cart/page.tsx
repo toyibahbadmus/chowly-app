@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ShoppingBag, ArrowLeft, Trash2, Clock, CheckCircle } from 'lucide-react';
@@ -12,20 +12,36 @@ function CartContent() {
   const tableId: string = searchParams.get('table') ?? 'TBL001';
   const sessionId: string = searchParams.get('session') ?? 'SES001';
 
-  const [cartItems, setCartItems] = useState([
-    { id: 'MENU001', name: 'Grilled Steak', price: 15000, quantity: 2, prepTime: 25, type: 'Food' },
-    { id: 'MENU002', name: 'Margarita', price: 4500, quantity: 3, prepTime: 10, type: 'Drink' },
-  ]);
+  const [cartItems, setCartItems] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Load items from localStorage on mount. If nothing was added, it remains empty ([]).
+  useEffect(() => {
+    const savedCart = localStorage.getItem('chowly_cart');
+    if (savedCart) {
+      try {
+        const parsed = JSON.parse(savedCart);
+        setCartItems(Array.isArray(parsed) ? parsed : []);
+      } catch (e) {
+        setCartItems([]);
+      }
+    }
+  }, []);
+
   const handleRemoveItem = (id: string) => {
-    setCartItems(cartItems.filter((item) => item.id !== id));
+    const updated = cartItems.filter((item) => item.id !== id);
+    setCartItems(updated);
+    localStorage.setItem('chowly_cart', JSON.stringify(updated));
   };
 
   const handleCheckoutSubmit = async () => {
+    if (cartItems.length === 0) {
+      alert('Your cart is empty. Please add items from the menu.');
+      return;
+    }
+
     setIsSubmitting(true);
     
-    // Map 'id' to 'menuId' to match the database action expected type
     const payloadItems = cartItems.map(item => ({
       menuId: item.id,
       quantity: item.quantity,
@@ -37,18 +53,18 @@ function CartContent() {
     setIsSubmitting(false);
 
     if (res.success && (res as any).orderId) {
+      localStorage.removeItem('chowly_cart');
       router.push(`/tracking?order=${(res as any).orderId}&table=${tableId}&session=${sessionId}`);
     } else {
       alert('Error submitting order to database.');
     }
   };
 
-  const totalAmount = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const maxWaitTime = cartItems.length > 0 ? Math.max(...cartItems.map((item) => item.prepTime)) : 0;
+  const totalAmount = cartItems.reduce((acc, item) => acc + (Number(item.price) * Number(item.quantity)), 0);
+  const maxWaitTime = cartItems.length > 0 ? Math.max(...cartItems.map((item) => Number(item.prepTime) || 15)) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href={`/menu?table=${tableId}&session=${sessionId}`} className="text-slate-500 hover:text-slate-800">
@@ -61,23 +77,28 @@ function CartContent() {
         </span>
       </header>
 
-      {/* Main Container */}
       <main className="max-w-xl mx-auto p-4 space-y-4">
         {cartItems.length === 0 ? (
-          <div className="restaurant-card p-8 bg-white text-center space-y-4">
-            <p className="text-slate-500 text-sm">Your cart is currently empty.</p>
+          <div className="restaurant-card p-12 bg-white text-center space-y-4 shadow-sm rounded-2xl border border-slate-100">
+            <div className="w-12 h-12 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto">
+              <ShoppingBag className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h2 className="font-bold text-slate-900 text-base">Your cart is currently empty</h2>
+              <p className="text-xs text-slate-400">Select fresh meals from your database menu to start an order session.</p>
+            </div>
             <Link
               href={`/menu?table=${tableId}&session=${sessionId}`}
-              className="inline-block bg-emerald-600 text-white text-xs font-medium px-4 py-2 rounded-xl shadow-sm"
+              className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-5 py-2.5 rounded-xl shadow-sm transition-all"
             >
-              Return to Menu
+              Go to Database Menu
             </Link>
           </div>
         ) : (
           <>
             <div className="space-y-3">
               {cartItems.map((item) => (
-                <div key={item.id} className="restaurant-card p-4 flex items-center justify-between bg-white">
+                <div key={item.id} className="restaurant-card p-4 flex items-center justify-between bg-white shadow-sm rounded-2xl border border-slate-100">
                   <div className="space-y-1">
                     <h3 className="font-bold text-slate-900">{item.name}</h3>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -90,7 +111,7 @@ function CartContent() {
                   </div>
                   <div className="text-right flex items-center gap-4">
                     <span className="font-bold text-slate-900">
-                      ₦{(item.price * item.quantity).toLocaleString()}
+                      ₦{(Number(item.price) * Number(item.quantity)).toLocaleString()}
                     </span>
                     <button
                       type="button"
@@ -104,8 +125,7 @@ function CartContent() {
               ))}
             </div>
 
-            {/* Order Summary Box */}
-            <div className="restaurant-card p-5 space-y-4 bg-white">
+            <div className="restaurant-card p-5 space-y-4 bg-white shadow-sm rounded-2xl border border-slate-100">
               <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-3">Summary & Estimated Wait</h2>
               
               <div className="space-y-2 text-sm">
@@ -125,10 +145,10 @@ function CartContent() {
                 type="button"
                 disabled={isSubmitting}
                 onClick={handleCheckoutSubmit}
-                className="w-full mt-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50"
+                className="w-full mt-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50 text-xs"
               >
                 <CheckCircle className="w-5 h-5" />
-                <span>{isSubmitting ? 'Saving to Database...' : 'Submit Multi-Item Order'}</span>
+                <span>{isSubmitting ? 'Writing to Database...' : 'Submit Multi-Item Order'}</span>
               </button>
             </div>
           </>

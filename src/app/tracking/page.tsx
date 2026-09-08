@@ -11,7 +11,7 @@ async function getOrderData(orderId: string) {
   try {
     const client = await pool.connect();
     
-    // Fetch order details
+    // Fetch live order details from PostgreSQL
     const orderRes = await client.query(
       `SELECT o.*, s.staff_name as waiter_name 
        FROM orders o 
@@ -20,7 +20,7 @@ async function getOrderData(orderId: string) {
       [orderId]
     );
 
-    // Fetch line items
+    // Fetch live line items joined with menu records from PostgreSQL
     const itemsRes = await client.query(
       `SELECT oi.*, m.item_name as name, m.item_type as type 
        FROM order_items oi 
@@ -36,7 +36,7 @@ async function getOrderData(orderId: string) {
       items: itemsRes.rows || [],
     };
   } catch (error) {
-    console.error('Failed to fetch order tracking data:', error);
+    console.error('Failed to fetch order tracking data from DB:', error);
     return { order: null, items: [] };
   }
 }
@@ -59,7 +59,6 @@ async function TrackingContent({
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href={`/cart?table=${tableId}&session=${sessionId}`} className="text-slate-500 hover:text-slate-800">
@@ -72,13 +71,10 @@ async function TrackingContent({
         </span>
       </header>
 
-      {/* Main Container */}
       <main className="max-w-xl mx-auto p-4 space-y-4">
-        
-        {/* Waiting Clock Card */}
-        <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-3">
+        <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-3 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-emerald-200 font-semibold">Live Kitchen Timer</span>
+            <span className="text-xs uppercase tracking-wider text-emerald-200 font-semibold">Live Database Timer</span>
             <span className="text-xs bg-emerald-500/40 px-2.5 py-1 rounded-full text-white">Order #{orderId}</span>
           </div>
           <div className="flex items-baseline gap-2">
@@ -91,13 +87,12 @@ async function TrackingContent({
           </p>
         </div>
 
-        {/* Item-by-Item Progress */}
-        <div className="restaurant-card p-5 bg-white space-y-4">
+        <div className="restaurant-card p-5 bg-white space-y-4 shadow-sm rounded-2xl border border-slate-100">
           <h3 className="font-bold text-slate-900 border-b border-slate-100 pb-3">Item Preparation Breakdown</h3>
           
           <div className="space-y-3">
             {items.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-4">No items found for this order reference.</p>
+              <p className="text-xs text-slate-400 text-center py-4">No items found for this order reference in database.</p>
             ) : (
               items.map((item: any) => (
                 <div key={item.order_item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
@@ -121,7 +116,6 @@ async function TrackingContent({
           </div>
         </div>
 
-        {/* Support & Action Links */}
         <div className="grid grid-cols-2 gap-3 pt-2">
           <Link
             href={`/complaint?order=${orderId}&table=${tableId}&session=${sessionId}`}
@@ -139,7 +133,6 @@ async function TrackingContent({
             <span>Proceed to Checkout</span>
           </Link>
         </div>
-
       </main>
     </div>
   );
@@ -151,7 +144,7 @@ export default function OrderTrackingPage({
   searchParams: Promise<{ order?: string; table?: string; session?: string }>;
 }) {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-400 text-sm">Loading order status...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-400 text-sm">Loading order status from DB...</div>}>
       <TrackingContent searchParams={searchParams} />
     </Suspense>
   );
