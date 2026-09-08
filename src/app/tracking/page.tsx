@@ -76,14 +76,14 @@ async function TrackingContent({
       <main className="max-w-xl mx-auto p-4 space-y-4">
         <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-3 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-emerald-200 font-semibold">{restaurantName}</span>
-            <span className="text-xs bg-emerald-500/40 px-2.5 py-1 rounded-full text-white">Order #{orderId}</span>
+            <span className="text-xs uppercase tracking-wider text-emerald-600 font-semibold">{restaurantName}</span>
+            <span className="text-xs bg-emerald-600 px-2.5 py-1 rounded-full text-white">Order #{orderId}</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-4xl font-extrabold tracking-tight">{totalWait}</h2>
-            <span className="text-sm font-medium text-emerald-100">Minutes Expected Wait</span>
+            <h2 className="text-4xl font-extrabold text-yellow-600 tracking-tight">{totalWait}</h2>
+            <span className="text-sm font-medium text-emerald-600">Minutes Expected Wait</span>
           </div>
-          <p className="text-xs text-emerald-100 pt-1 border-t border-emerald-500/30 flex items-center justify-between">
+          <p className="text-xs text-emerald-600 pt-1 border-t border-emerald-500/30 flex items-center justify-between">
             <span>Waiter: <strong>{waiterName}</strong></span>
             <span>Table: <strong>{tableId}</strong></span>
           </p>

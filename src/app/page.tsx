@@ -37,11 +37,19 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900 tracking-tight">Chowly</h1>
-          <p className="text-xs text-emerald-600 font-medium">Multi-Restaurant Dine-In System</p>
-        </div>
+      <header className="bg-emerald-600 border-b border-slate-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex items-center gap-2 group cursor-pointer">
+  <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-emerald-400 flex items-center justify-center text-white shadow-lg shadow-emerald-600/30 group-hover:scale-105 transition-all">
+    <span className="text-lg font-black tracking-tighter">C</span>
+  </div>
+  <div className="flex flex-col">
+    <h1 className="text-xl font-black text-white tracking-tighter flex items-center gap-1">
+      Chowly<span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+    </h1>
+    <span className="text-[10px] font-bold text-white uppercase tracking-widest leading-none">Multi-Restaurant Dine-In System</span>
+  </div>
+</div>
+      
         <Link
           href="/waiter"
           className="text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl transition-all flex items-center gap-1.5"
@@ -53,11 +61,11 @@ export default function HomePage() {
       <main className="max-w-xl mx-auto p-4 sm:p-6 space-y-6">
         <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-3 rounded-2xl">
           <div className="flex items-center justify-between">
-            <span className="text-xs uppercase tracking-wider text-emerald-200 font-semibold">Live PostgreSQL System</span>
-            <span className="text-xs bg-emerald-500/40 px-2.5 py-1 rounded-full text-white">5 Active Branches</span>
+            <span className="text-xs tracking-wider text-black font-semibold">Welcome</span>
+            <span className="text-xs bg-emerald-600 px-2.5 py-1 rounded-full text-white">5 Active Branches</span>
           </div>
-          <h2 className="text-2xl font-extrabold tracking-tight">Choose Restaurant & Table</h2>
-          <p className="text-xs text-emerald-100">
+          <h2 className="text-2xl font-extrabold tracking-tight text-emerald-600">Choose Restaurant & Table</h2>
+          <p className="text-xs text-black">
             Select your preferred dining branch and table number to begin your order session.
           </p>
         </div>

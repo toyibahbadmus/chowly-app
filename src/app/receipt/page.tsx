@@ -69,7 +69,7 @@ function ReceiptContent() {
             <h2 className="text-xl font-extrabold text-slate-900">{restaurantName}</h2>
             <p className="text-xs text-slate-500">{restaurantLocation} • Table {tableId}</p>
             <span className="inline-block text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-              Settled & Paid
+              Settled & Paid (Pretend)
             </span>
           </div>
 

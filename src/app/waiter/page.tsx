@@ -37,8 +37,8 @@ export default async function WaiterHubPage() {
 
       <main className="max-w-xl mx-auto p-4 sm:p-6 space-y-6">
         <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-2 rounded-2xl">
-          <h2 className="text-2xl font-extrabold tracking-tight">Select Branch Workspace</h2>
-          <p className="text-xs text-emerald-100">
+          <h2 className="text-2xl font-extrabold tracking-tight text-emerald-600">Select Branch Workspace</h2>
+          <p className="text-xs text-black">
             Choose a restaurant branch to view its live active orders, assign kitchen staff, and manage table service.
           </p>
         </div>
