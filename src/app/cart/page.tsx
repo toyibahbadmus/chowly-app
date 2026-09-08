@@ -9,15 +9,17 @@ import { submitOrderAction } from '@/app/actions';
 function CartContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tableId: string = searchParams.get('table') ?? 'TBL001';
-  const sessionId: string = searchParams.get('session') ?? 'SES001';
+  const restaurantId = searchParams.get('restaurant') || '1';
+  const tableId = searchParams.get('table') || '01';
+  const sessionId = searchParams.get('session') || 'SES001';
 
   const [cartItems, setCartItems] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Load items from localStorage on mount. If nothing was added, it remains empty ([]).
+  const cartKey = 'chowly_active_cart';
+
   useEffect(() => {
-    const savedCart = localStorage.getItem('chowly_cart');
+    const savedCart = localStorage.getItem(cartKey);
     if (savedCart) {
       try {
         const parsed = JSON.parse(savedCart);
@@ -31,7 +33,7 @@ function CartContent() {
   const handleRemoveItem = (id: string) => {
     const updated = cartItems.filter((item) => item.id !== id);
     setCartItems(updated);
-    localStorage.setItem('chowly_cart', JSON.stringify(updated));
+    localStorage.setItem(cartKey, JSON.stringify(updated));
   };
 
   const handleCheckoutSubmit = async () => {
@@ -49,12 +51,12 @@ function CartContent() {
       prepTime: item.prepTime
     }));
 
-    const res = await submitOrderAction(sessionId, 'STF001', payloadItems);
+    const res = await submitOrderAction(restaurantId, sessionId, '1', payloadItems);
     setIsSubmitting(false);
 
     if (res.success && (res as any).orderId) {
-      localStorage.removeItem('chowly_cart');
-      router.push(`/tracking?order=${(res as any).orderId}&table=${tableId}&session=${sessionId}`);
+      localStorage.removeItem(cartKey);
+      router.push(`/tracking?order=${(res as any).orderId}&restaurant=${restaurantId}&table=${tableId}&session=${sessionId}`);
     } else {
       alert('Error submitting order to database.');
     }
@@ -67,13 +69,13 @@ function CartContent() {
     <div className="min-h-screen bg-slate-50 pb-20">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/menu?table=${tableId}&session=${sessionId}`} className="text-slate-500 hover:text-slate-800">
+          <Link href={`/menu?restaurant=${restaurantId}&table=${tableId}&session=${sessionId}`} className="text-slate-500 hover:text-slate-800">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <h1 className="text-lg font-bold text-slate-900 leading-tight">Your Order Cart</h1>
         </div>
         <span className="text-xs bg-emerald-100 text-emerald-800 font-medium px-2.5 py-1 rounded-full">
-          Table Active ({tableId})
+          Table {tableId}
         </span>
       </header>
 
@@ -85,13 +87,13 @@ function CartContent() {
             </div>
             <div className="space-y-1">
               <h2 className="font-bold text-slate-900 text-base">Your cart is currently empty</h2>
-              <p className="text-xs text-slate-400">Select fresh meals from your database menu to start an order session.</p>
+              <p className="text-xs text-slate-400">Select meals from the menu to start your order.</p>
             </div>
             <Link
-              href={`/menu?table=${tableId}&session=${sessionId}`}
+              href={`/menu?restaurant=${restaurantId}&table=${tableId}&session=${sessionId}`}
               className="inline-block bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-5 py-2.5 rounded-xl shadow-sm transition-all"
             >
-              Go to Database Menu
+              Return to Menu
             </Link>
           </div>
         ) : (
@@ -130,13 +132,13 @@ function CartContent() {
               
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between text-slate-600">
-                  <span>Maximum Expected Preparation Time</span>
+                  <span>Maximum Preparation Time</span>
                   <span className="font-semibold text-emerald-600 flex items-center gap-1">
                     <Clock className="w-4 h-4" /> {maxWaitTime} Minutes
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-900 font-bold text-base pt-2 border-t border-slate-100">
-                  <span>Total Expected Bill</span>
+                  <span>Total Bill</span>
                   <span className="text-emerald-600">₦{totalAmount.toLocaleString()}</span>
                 </div>
               </div>
@@ -148,7 +150,7 @@ function CartContent() {
                 className="w-full mt-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50 text-xs"
               >
                 <CheckCircle className="w-5 h-5" />
-                <span>{isSubmitting ? 'Writing to Database...' : 'Submit Multi-Item Order'}</span>
+                <span>{isSubmitting ? 'Writing to Database...' : 'Submit Order'}</span>
               </button>
             </div>
           </>

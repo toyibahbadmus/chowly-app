@@ -6,7 +6,38 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/chowly_db',
 });
 
-// 1. Fetch menu items matching your schema columns (estimated_prep_time)
+// 1. Fetch all available restaurants
+export async function getRestaurantsAction() {
+  const client = await pool.connect();
+  try {
+    const res = await client.query('SELECT restaurant_id as id, restaurant_name as name, location, contact_number FROM restaurants ORDER BY restaurant_id');
+    return res.rows;
+  } catch (error) {
+    console.error('Failed to fetch restaurants:', error);
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// 2. Fetch tables for a specific restaurant
+export async function getTablesForRestaurantAction(restaurantId: string | number) {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(
+      'SELECT table_id as id, table_number as number, capacity, table_status as status FROM restaurant_tables WHERE restaurant_id = $1 ORDER BY table_number',
+      [Number(restaurantId)]
+    );
+    return res.rows;
+  } catch (error) {
+    console.error('Failed to fetch tables:', error);
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// 3. Fetch global menu items
 export async function getMenuItemsAction() {
   const client = await pool.connect();
   try {
@@ -22,32 +53,32 @@ export async function getMenuItemsAction() {
   }
 }
 
-// 2. Submit order using INTEGER serial keys properly
-export async function submitOrderAction(sessionId: string, staffId: string, items: any[]) {
+// 4. Submit order transaction with restaurant_id
+export async function submitOrderAction(restaurantId: string | number, sessionId: string, staffId: string, items: any[]) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const maxWaitTime = items.length > 0 ? Math.max(...items.map((i) => Number(i.prepTime) || 15)) : 25;
+    const parsedRestaurantId = Number(restaurantId) || 1;
     const parsedSessionId = Number(sessionId.replace(/\D/g, '')) || 1;
-    const parsedStaffId = Number(staffId.replace(/\D/g, '')) || 1;
+    
+    const staffRes = await client.query('SELECT staff_id FROM staff WHERE restaurant_id = $1 LIMIT 1', [parsedRestaurantId]);
+    const parsedStaffId = staffRes.rows[0]?.staff_id || 1;
 
-    // Insert into orders (order_id is auto-increment SERIAL)
     const orderRes = await client.query(
-      `INSERT INTO orders (session_id, staff_id, overall_status, total_expected_wait, order_time) 
-       VALUES ($1, $2, 'Processing', $3, CURRENT_TIMESTAMP) RETURNING order_id`,
-      [parsedSessionId, parsedStaffId, maxWaitTime]
+      `INSERT INTO orders (restaurant_id, session_id, staff_id, overall_status, total_expected_wait, order_time) 
+       VALUES ($1, $2, $3, 'Processing', $4, CURRENT_TIMESTAMP) RETURNING order_id`,
+      [parsedRestaurantId, parsedSessionId, parsedStaffId, maxWaitTime]
     );
 
     const orderId = orderRes.rows[0].order_id;
 
-    // Insert each line item into order_items
     for (const item of items) {
-      const targetMenuId = Number(item.menuId || item.id);
+      const targetMenuId = Number(item.id || item.menuId);
       const targetQuantity = Number(item.quantity) || 1;
       const targetPrepTime = Number(item.prepTime) || 15;
 
-      // Fetch current item price from database to ensure accuracy
       const priceRes = await client.query('SELECT price FROM menu WHERE menu_id = $1', [targetMenuId]);
       const unitPrice = priceRes.rows[0]?.price || item.price || 0;
 
@@ -69,7 +100,7 @@ export async function submitOrderAction(sessionId: string, staffId: string, item
   }
 }
 
-// 3. Get exact order total dynamically from order_items
+// 5. Get exact order total
 export async function getOrderTotalFromDB(orderId: string | number) {
   const client = await pool.connect();
   try {
@@ -88,7 +119,7 @@ export async function getOrderTotalFromDB(orderId: string | number) {
   }
 }
 
-// 4. Submit payment and log into payments table + update order status
+// 6. Submit payment
 export async function submitPaymentAction(orderId: string | number, totalAmount: number, paymentMethod: string) {
   const client = await pool.connect();
   try {
@@ -116,13 +147,14 @@ export async function submitPaymentAction(orderId: string | number, totalAmount:
   }
 }
 
-// 5. Fetch receipt data matching schema columns
+// 7. Fetch receipt data with restaurant details
 export async function getReceiptDataAction(orderId: string | number) {
   const client = await pool.connect();
   try {
     const orderRes = await client.query(
-      `SELECT o.*, s.staff_name as waiter_name 
+      `SELECT o.*, r.restaurant_name, r.location, s.staff_name as waiter_name 
        FROM orders o 
+       LEFT JOIN restaurants r ON o.restaurant_id = r.restaurant_id 
        LEFT JOIN staff s ON o.staff_id = s.staff_id 
        WHERE o.order_id = $1`,
       [Number(orderId)]
@@ -148,7 +180,7 @@ export async function getReceiptDataAction(orderId: string | number) {
   }
 }
 
-// 6. Submit feedback into the complaints table
+// 8. Submit feedback
 export async function submitComplaintAction(orderId: string | number, complaintText: string, rating: number) {
   const client = await pool.connect();
   try {
@@ -166,18 +198,84 @@ export async function submitComplaintAction(orderId: string | number, complaintT
   }
 }
 
-// 7. Restaurant info fetcher
-export async function getRestaurantInfoAction() {
+// 9. Fetch staff members for a specific restaurant
+export async function getStaffForRestaurantAction(restaurantId: string | number, role?: string) {
   const client = await pool.connect();
   try {
-    const res = await client.query('SELECT restaurant_name, location FROM restaurants WHERE restaurant_id = 1');
-    const rest = res.rows[0];
+    let query = 'SELECT staff_id as id, staff_name as name, staff_role as role FROM staff WHERE restaurant_id = $1';
+    let params: any[] = [Number(restaurantId)];
+
+    if (role) {
+      query += ' AND staff_role = $2';
+      params.push(role);
+    }
+
+    const res = await client.query(query, params);
+    return res.rows;
+  } catch (error) {
+    console.error('Failed to fetch staff:', error);
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+// 10. Update order assignment (Chef, Bartender) and status
+export async function updateOrderAssignmentAction(orderId: string | number, chefId: string | number, bartenderId: string | number, status: string) {
+  const client = await pool.connect();
+  try {
+    await client.query(
+      `UPDATE orders 
+       SET chef_id = $1, bartender_id = $2, overall_status = $3 
+       WHERE order_id = $4`,
+      [Number(chefId) || null, Number(bartenderId) || null, status, Number(orderId)]
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to update order assignment:', error);
+    return { success: false };
+  } finally {
+    client.release();
+  }
+}
+
+// 11. Fetch active orders and staff for a specific restaurant branch
+export async function getWaiterBranchDataAction(restaurantId: string | number) {
+  const client = await pool.connect();
+  try {
+    const parsedRestId = Number(restaurantId) || 1;
+
+    const ordersRes = await client.query(
+      `SELECT o.*, r.restaurant_name, s.staff_name as waiter_name 
+       FROM orders o 
+       LEFT JOIN restaurants r ON o.restaurant_id = r.restaurant_id 
+       LEFT JOIN staff s ON o.staff_id = s.staff_id 
+       WHERE o.restaurant_id = $1 
+       ORDER BY o.order_time DESC`,
+      [parsedRestId]
+    );
+
+    const itemsRes = await client.query(
+      `SELECT oi.*, m.item_name as name 
+       FROM order_items oi 
+       LEFT JOIN menu m ON oi.menu_id = m.menu_id`
+    );
+
+    const staffRes = await client.query(
+      `SELECT staff_id as id, staff_name as name, staff_role as role 
+       FROM staff 
+       WHERE restaurant_id = $1`,
+      [parsedRestId]
+    );
+
     return {
-      branchName: rest ? `${rest.restaurant_name} • ${rest.location} Branch` : 'Ocean Basket • Ikeja',
-      status: 'Open & Accepting Orders',
+      orders: ordersRes.rows || [],
+      items: itemsRes.rows || [],
+      staff: staffRes.rows || [],
     };
   } catch (error) {
-    return { branchName: 'Ocean Basket', status: 'Online' };
+    console.error('Failed to fetch waiter branch data:', error);
+    return { orders: [], items: [], staff: [] };
   } finally {
     client.release();
   }

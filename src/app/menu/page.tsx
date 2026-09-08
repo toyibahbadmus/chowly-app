@@ -4,38 +4,56 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { Utensils, ShoppingBag, Clock, ArrowLeft, Check } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
-import { getMenuItemsAction } from '@/app/actions';
+import { getMenuItemsAction, getRestaurantsAction } from '@/app/actions';
 
 function MenuContent() {
   const searchParams = useSearchParams();
-  const tableId = searchParams.get('table') || 'TBL001';
+  const restaurantId = searchParams.get('restaurant') || '1';
+  const tableId = searchParams.get('table') || '01';
   const sessionId = searchParams.get('session') || 'SES001';
 
+  const [restaurantName, setRestaurantName] = useState('Restaurant');
   const [menuItems, setMenuItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cartCount, setCartCount] = useState(0);
   const [addedItems, setAddedItems] = useState<{ [key: string]: boolean }>({});
 
-  // Fetch menu items from PostgreSQL on mount
-  useEffect(() => {
-    async function fetchMenu() {
-      const items = await getMenuItemsAction();
-      setMenuItems(items);
-      setLoading(false);
-    }
-    fetchMenu();
+  const cartKey = 'chowly_active_cart';
 
-    // Check existing cart count
-    const savedCart = localStorage.getItem('chowly_cart');
-    if (savedCart) {
-      const items = JSON.parse(savedCart);
-      const totalQty = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
-      setCartCount(totalQty);
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [items, rests] = await Promise.all([
+          getMenuItemsAction(),
+          getRestaurantsAction(),
+        ]);
+        setMenuItems(items);
+        const currentRest = rests.find((r: any) => String(r.id) === String(restaurantId));
+        if (currentRest) {
+          setRestaurantName(currentRest.name);
+        }
+      } catch (error) {
+        console.error('Error loading menu:', error);
+      } finally {
+        setLoading(false);
+      }
     }
-  }, []);
+    loadData();
+
+    const savedCart = localStorage.getItem(cartKey);
+    if (savedCart) {
+      try {
+        const items = JSON.parse(savedCart);
+        const totalQty = items.reduce((acc: number, item: any) => acc + item.quantity, 0);
+        setCartCount(totalQty);
+      } catch (e) {
+        setCartCount(0);
+      }
+    }
+  }, [restaurantId]);
 
   const handleAddToCart = (item: any) => {
-    const savedCart = localStorage.getItem('chowly_cart');
+    const savedCart = localStorage.getItem(cartKey);
     let cart = savedCart ? JSON.parse(savedCart) : [];
 
     const existingIndex = cart.findIndex((cartItem: any) => cartItem.id === item.id);
@@ -45,7 +63,7 @@ function MenuContent() {
       cart.push({ ...item, quantity: 1 });
     }
 
-    localStorage.setItem('chowly_cart', JSON.stringify(cart));
+    localStorage.setItem(cartKey, JSON.stringify(cart));
 
     const totalQty = cart.reduce((acc: number, cartItem: any) => acc + cartItem.quantity, 0);
     setCartCount(totalQty);
@@ -60,22 +78,22 @@ function MenuContent() {
     <div className="min-h-screen bg-slate-50 pb-20">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/" className="text-slate-500 hover:text-slate-800">
+          <Link href={`/?restaurant=${restaurantId}`} className="text-slate-500 hover:text-slate-800">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-lg font-bold text-slate-900 leading-tight">Ocean Basket • Menu</h1>
+            <h1 className="text-lg font-bold text-slate-900 leading-tight">{restaurantName}</h1>
             <p className="text-xs text-emerald-600 font-medium">Table Active ({tableId})</p>
           </div>
         </div>
 
         <Link
-          href={`/cart?table=${tableId}&session=${sessionId}`}
+          href={`/cart?restaurant=${restaurantId}&table=${tableId}&session=${sessionId}`}
           className="relative bg-emerald-50 text-emerald-700 p-2.5 rounded-xl hover:bg-emerald-100 transition-colors flex items-center justify-center cursor-pointer"
         >
           <ShoppingBag className="w-5 h-5" />
           {cartCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-pulse">
+            <span className="absolute -top-1 -right-1 bg-amber-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
               {cartCount}
             </span>
           )}
@@ -83,15 +101,12 @@ function MenuContent() {
       </header>
 
       <main className="max-w-3xl mx-auto p-4 space-y-4">
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-800 text-xs flex items-center gap-2">
-          <Utensils className="w-4 h-4 shrink-0 text-amber-600" />
-          <span>Menu items loaded live from your PostgreSQL database. Click "Add to Cart" to start your session.</span>
-        </div>
-
         {loading ? (
-          <div className="text-center py-12 text-slate-400 text-sm">Loading menu from database...</div>
+          <div className="text-center py-12 text-slate-400 text-sm">Loading global menu items...</div>
         ) : menuItems.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 text-sm">No menu items found in database. Please check your database seed.</div>
+          <div className="restaurant-card p-12 bg-white text-center space-y-3 shadow-sm rounded-2xl border border-slate-100">
+            <p className="text-slate-500 text-sm">No available menu items found in the database.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
             {menuItems.map((item) => {
@@ -109,7 +124,7 @@ function MenuContent() {
                       </div>
                     </div>
                     <h2 className="text-lg font-bold text-slate-900 pt-1">{item.name}</h2>
-                    <p className="text-xs text-slate-500 line-clamp-2">{item.description || 'Freshly prepared specialty dish.'}</p>
+                    <p className="text-xs text-slate-500 line-clamp-2">{item.description}</p>
                   </div>
 
                   <div className="flex items-center justify-between pt-3 border-t border-slate-100">
@@ -120,9 +135,7 @@ function MenuContent() {
                       type="button"
                       onClick={() => handleAddToCart(item)}
                       className={`text-xs font-medium px-4 py-2 rounded-lg shadow-sm transition-all flex items-center gap-1.5 cursor-pointer ${
-                        isJustAdded
-                          ? 'bg-emerald-700 text-white'
-                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                        isJustAdded ? 'bg-emerald-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                       }`}
                     >
                       {isJustAdded ? (
