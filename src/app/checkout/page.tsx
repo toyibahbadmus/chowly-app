@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { submitPaymentAction } from '@/app/actions';
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const orderId = searchParams.get('order') || 'ORD001';
@@ -92,5 +92,13 @@ export default function CheckoutPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-400 text-sm">Loading checkout...</div>}>
+      <CheckoutContent />
+    </Suspense>
   );
 }
