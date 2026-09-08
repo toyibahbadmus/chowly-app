@@ -1,8 +1,47 @@
-'use client'
+import { Suspense } from 'react';
 import Link from 'next/link';
-import { Clock, CheckCircle2, AlertCircle, ArrowLeft, Star, MessageSquare } from 'lucide-react';
+import { Clock, CheckCircle2, MessageSquare, ArrowLeft } from 'lucide-react';
+import { Pool } from 'pg';
 
-export default async function OrderTrackingPage({
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/chowly_db',
+});
+
+async function getOrderData(orderId: string) {
+  try {
+    const client = await pool.connect();
+    
+    // Fetch order details
+    const orderRes = await client.query(
+      `SELECT o.*, s.staff_name as waiter_name 
+       FROM orders o 
+       LEFT JOIN staff s ON o.staff_id = s.staff_id 
+       WHERE o.order_id = $1`,
+      [orderId]
+    );
+
+    // Fetch line items
+    const itemsRes = await client.query(
+      `SELECT oi.*, m.item_name as name, m.item_type as type 
+       FROM order_items oi 
+       LEFT JOIN menu m ON oi.menu_id = m.menu_id 
+       WHERE oi.order_id = $1`,
+      [orderId]
+    );
+
+    client.release();
+
+    return {
+      order: orderRes.rows[0] || null,
+      items: itemsRes.rows || [],
+    };
+  } catch (error) {
+    console.error('Failed to fetch order tracking data:', error);
+    return { order: null, items: [] };
+  }
+}
+
+async function TrackingContent({
   searchParams,
 }: {
   searchParams: Promise<{ order?: string; table?: string; session?: string }>;
@@ -12,18 +51,11 @@ export default async function OrderTrackingPage({
   const tableId = params.table || 'TBL001';
   const sessionId = params.session || 'SES001';
 
-  // Live order and item status mirroring our database schema (orders & order_items)
-  const orderDetails = {
-    orderId: orderId,
-    orderTime: '18:30',
-    totalExpectedWait: 25,
-    overallStatus: 'Processing',
-    waiterName: 'David',
-    items: [
-      { id: 'ORIT001', name: 'Grilled Steak', quantity: 2, status: 'Preparing', prepTime: 25 },
-      { id: 'ORIT002', name: 'Margarita', quantity: 3, status: 'Served', prepTime: 10 },
-    ],
-  };
+  const { order, items } = await getOrderData(orderId);
+
+  const totalWait = order?.total_expected_wait || 25;
+  const overallStatus = order?.overall_status || 'Processing';
+  const waiterName = order?.waiter_name || 'David';
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -36,7 +68,7 @@ export default async function OrderTrackingPage({
           <h1 className="text-lg font-bold text-slate-900 leading-tight">Order Status Tracking</h1>
         </div>
         <span className="text-xs bg-amber-100 text-amber-800 font-medium px-2.5 py-1 rounded-full uppercase">
-          {orderDetails.overallStatus}
+          {overallStatus}
         </span>
       </header>
 
@@ -47,14 +79,14 @@ export default async function OrderTrackingPage({
         <div className="restaurant-card p-6 bg-gradient-to-br from-emerald-600 to-emerald-800 text-white shadow-lg space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-xs uppercase tracking-wider text-emerald-200 font-semibold">Live Kitchen Timer</span>
-            <span className="text-xs bg-emerald-500/40 px-2.5 py-1 rounded-full text-white">Order #{orderDetails.orderId}</span>
+            <span className="text-xs bg-emerald-500/40 px-2.5 py-1 rounded-full text-white">Order #{orderId}</span>
           </div>
           <div className="flex items-baseline gap-2">
-            <h2 className="text-4xl font-extrabold tracking-tight">{orderDetails.totalExpectedWait}</h2>
+            <h2 className="text-4xl font-extrabold tracking-tight">{totalWait}</h2>
             <span className="text-sm font-medium text-emerald-100">Minutes Expected Wait</span>
           </div>
           <p className="text-xs text-emerald-100 pt-1 border-t border-emerald-500/30 flex items-center justify-between">
-            <span>Assigned Waiter: <strong>{orderDetails.waiterName}</strong></span>
+            <span>Assigned Waiter: <strong>{waiterName}</strong></span>
             <span>Table: <strong>{tableId}</strong></span>
           </p>
         </div>
@@ -64,24 +96,28 @@ export default async function OrderTrackingPage({
           <h3 className="font-bold text-slate-900 border-b border-slate-100 pb-3">Item Preparation Breakdown</h3>
           
           <div className="space-y-3">
-            {orderDetails.items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                <div className="space-y-0.5">
-                  <h4 className="font-bold text-slate-900 text-sm">{item.name}</h4>
-                  <p className="text-xs text-slate-500">Quantity: {item.quantity}</p>
+            {items.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">No items found for this order reference.</p>
+            ) : (
+              items.map((item: any) => (
+                <div key={item.order_item_id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                  <div className="space-y-0.5">
+                    <h4 className="font-bold text-slate-900 text-sm">{item.name || 'Menu Item'}</h4>
+                    <p className="text-xs text-slate-500">Quantity: {item.quantity} • {item.type}</p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${
+                      item.item_preparation_status === 'Served' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {item.item_preparation_status || 'Preparing'}
+                    </span>
+                    <p className="text-[10px] text-slate-400 pt-1 flex items-center justify-end gap-1">
+                      <Clock className="w-3 h-3" /> {item.max_prep_time || 15} mins
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className={`inline-block text-xs font-semibold px-2.5 py-1 rounded-full ${
-                    item.status === 'Served' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {item.status}
-                  </span>
-                  <p className="text-[10px] text-slate-400 pt-1 flex items-center justify-end gap-1">
-                    <Clock className="w-3 h-3" /> {item.prepTime} mins
-                  </p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
@@ -96,7 +132,7 @@ export default async function OrderTrackingPage({
           </Link>
 
           <Link
-            href={`/receipt?order=${orderId}&table=${tableId}&session=${sessionId}`}
+            href={`/checkout?order=${orderId}&table=${tableId}&session=${sessionId}`}
             className="flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium py-3 px-4 rounded-xl shadow-md transition-all"
           >
             <CheckCircle2 className="w-4 h-4" />
@@ -106,5 +142,17 @@ export default async function OrderTrackingPage({
 
       </main>
     </div>
+  );
+}
+
+export default function OrderTrackingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ order?: string; table?: string; session?: string }>;
+}) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-400 text-sm">Loading order status...</div>}>
+      <TrackingContent searchParams={searchParams} />
+    </Suspense>
   );
 }
