@@ -1,3 +1,5 @@
+'use client';
+
 import Link from 'next/link';
 import { Users, ClipboardList, CheckCircle2, Clock, ChefHat, GlassWater, ArrowLeft } from 'lucide-react';
 
@@ -127,3 +129,4 @@ export default async function WaiterDashboard() {
     </div>
   );
 }
+

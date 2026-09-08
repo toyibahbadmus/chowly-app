@@ -1,21 +1,36 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CreditCard, ShieldCheck, CheckCircle2, Wallet } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { submitPaymentAction } from '@/app/actions';
 
-export default async function CheckoutPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ order?: string; table?: string; session?: string }>;
-}) {
-  const params = await searchParams;
-  const orderId = params.order || 'ORD001';
-  const tableId = params.table || 'TBL001';
-  const sessionId = params.session || 'SES001';
+export default function CheckoutPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const orderId = searchParams.get('order') || 'ORD001';
+  const tableId = searchParams.get('table') || 'TBL001';
+  const sessionId = searchParams.get('session') || 'SES001';
 
-  const totalAmount = 45500; // Total from our order items
+  const [paymentMethod, setPaymentMethod] = useState('Card');
+  const [processing, setProcessing] = useState(false);
+  const totalAmount = 45500;
+
+  const handlePayment = async () => {
+    setProcessing(true);
+    const res = await submitPaymentAction(orderId, totalAmount, paymentMethod);
+    setProcessing(false);
+
+    if (res.success) {
+      router.push(`/receipt?order=${orderId}&table=${tableId}&session=${sessionId}`);
+    } else {
+      alert('Payment processing failed.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
-      {/* Header */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link href={`/tracking?order=${orderId}&table=${tableId}&session=${sessionId}`} className="text-slate-500 hover:text-slate-800">
@@ -28,12 +43,11 @@ export default async function CheckoutPage({
         </span>
       </header>
 
-      {/* Main Container */}
       <main className="max-w-md mx-auto p-4 space-y-4">
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-xs flex items-start gap-3">
           <ShieldCheck className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
           <p>
-            You are settling your bill just before exiting the restaurant[cite: 1, 2]. All transactions on Chowly are <strong>pretend payments</strong> for demonstration purposes[cite: 1, 2].
+            You are settling your bill just before exiting the restaurant. All payments on Chowly are <strong>pretend payments</strong> clearly labelled for demonstration.
           </p>
         </div>
 
@@ -46,38 +60,35 @@ export default async function CheckoutPage({
 
           <div className="space-y-3">
             <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider">
-              Select Pretend Payment Method[cite: 1, 2]
+              Select Pretend Payment Method
             </label>
-
             <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                className="p-3 border-2 border-emerald-600 bg-emerald-50 rounded-xl text-center font-bold text-emerald-800 text-xs"
-              >
-                Card
-              </button>
-              <button
-                type="button"
-                className="p-3 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-center font-medium text-slate-700 text-xs"
-              >
-                Transfer
-              </button>
-              <button
-                type="button"
-                className="p-3 border border-slate-200 bg-white hover:bg-slate-50 rounded-xl text-center font-medium text-slate-700 text-xs"
-              >
-                Cash
-              </button>
+              {['Card', 'Transfer', 'Cash'].map((method) => (
+                <button
+                  key={method}
+                  type="button"
+                  onClick={() => setPaymentMethod(method)}
+                  className={`p-3 rounded-xl text-center font-medium text-xs cursor-pointer transition-all ${
+                    paymentMethod === method
+                      ? 'border-2 border-emerald-600 bg-emerald-50 text-emerald-800 font-bold'
+                      : 'border border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  {method}
+                </button>
+              ))}
             </div>
           </div>
 
-          <Link
-            href={`/receipt?order=${orderId}&table=${tableId}&session=${sessionId}`}
-            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all"
+          <button
+            type="button"
+            disabled={processing}
+            onClick={handlePayment}
+            className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all cursor-pointer disabled:opacity-50"
           >
             <CheckCircle2 className="w-5 h-5" />
-            <span>Confirm Pretend Payment[cite: 1, 2]</span>
-          </Link>
+            <span>{processing ? 'Recording Payment...' : 'Confirm Pretend Payment'}</span>
+          </button>
         </div>
       </main>
     </div>

@@ -1,37 +1,50 @@
+'use client';
+
+import { useState, Suspense } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ShoppingBag, ArrowLeft, Trash2, Clock, CheckCircle } from 'lucide-react';
+import { submitOrderAction } from '@/app/actions';
 
-export default async function CartPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ table?: string; session?: string }>;
-}) {
-  const params = await searchParams;
-  const tableId = params.table || 'TBL001';
-  const sessionId = params.session || 'SES001';
+function CartContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tableId: string = searchParams.get('table') ?? 'TBL001';
+  const sessionId: string = searchParams.get('session') ?? 'SES001';
 
-  // Cart items state mirroring order_items table structure
-  const cartItems = [
-    {
-      id: 'ORIT001',
-      name: 'Grilled Steak',
-      price: 15000,
-      quantity: 2,
-      prepTime: 25,
-      type: 'Food',
-    },
-    {
-      id: 'ORIT002',
-      name: 'Margarita',
-      price: 4500,
-      quantity: 3,
-      prepTime: 10,
-      type: 'Drink',
-    },
-  ];
+  const [cartItems, setCartItems] = useState([
+    { id: 'MENU001', name: 'Grilled Steak', price: 15000, quantity: 2, prepTime: 25, type: 'Food' },
+    { id: 'MENU002', name: 'Margarita', price: 4500, quantity: 3, prepTime: 10, type: 'Drink' },
+  ]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleRemoveItem = (id: string) => {
+    setCartItems(cartItems.filter((item) => item.id !== id));
+  };
+
+  const handleCheckoutSubmit = async () => {
+    setIsSubmitting(true);
+    
+    // Map 'id' to 'menuId' to match the database action expected type
+    const payloadItems = cartItems.map(item => ({
+      menuId: item.id,
+      quantity: item.quantity,
+      price: item.price,
+      prepTime: item.prepTime
+    }));
+
+    const res = await submitOrderAction(sessionId, 'STF001', payloadItems);
+    setIsSubmitting(false);
+
+    if (res.success && (res as any).orderId) {
+      router.push(`/tracking?order=${(res as any).orderId}&table=${tableId}&session=${sessionId}`);
+    } else {
+      alert('Error submitting order to database.');
+    }
+  };
 
   const totalAmount = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const maxWaitTime = Math.max(...cartItems.map((item) => item.prepTime));
+  const maxWaitTime = cartItems.length > 0 ? Math.max(...cartItems.map((item) => item.prepTime)) : 0;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-20">
@@ -50,57 +63,85 @@ export default async function CartPage({
 
       {/* Main Container */}
       <main className="max-w-xl mx-auto p-4 space-y-4">
-        <div className="space-y-3">
-          {cartItems.map((item) => (
-            <div key={item.id} className="restaurant-card p-4 flex items-center justify-between">
-              <div className="space-y-1">
-                <h3 className="font-bold text-slate-900">{item.name}</h3>
-                <div className="flex items-center gap-3 text-xs text-slate-500">
-                  <span>Qty: {item.quantity}</span>
-                  <span>•</span>
-                  <span className="flex items-center gap-1 text-emerald-600 font-medium">
-                    <Clock className="w-3 h-3" /> {item.prepTime} mins
+        {cartItems.length === 0 ? (
+          <div className="restaurant-card p-8 bg-white text-center space-y-4">
+            <p className="text-slate-500 text-sm">Your cart is currently empty.</p>
+            <Link
+              href={`/menu?table=${tableId}&session=${sessionId}`}
+              className="inline-block bg-emerald-600 text-white text-xs font-medium px-4 py-2 rounded-xl shadow-sm"
+            >
+              Return to Menu
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-3">
+              {cartItems.map((item) => (
+                <div key={item.id} className="restaurant-card p-4 flex items-center justify-between bg-white">
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-slate-900">{item.name}</h3>
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <span>Qty: {item.quantity}</span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                        <Clock className="w-3 h-3" /> {item.prepTime} mins
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right flex items-center gap-4">
+                    <span className="font-bold text-slate-900">
+                      ₦{(item.price * item.quantity).toLocaleString()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item.id)}
+                      className="text-slate-400 hover:text-red-500 transition-colors p-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Order Summary Box */}
+            <div className="restaurant-card p-5 space-y-4 bg-white">
+              <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-3">Summary & Estimated Wait</h2>
+              
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-slate-600">
+                  <span>Maximum Expected Preparation Time</span>
+                  <span className="font-semibold text-emerald-600 flex items-center gap-1">
+                    <Clock className="w-4 h-4" /> {maxWaitTime} Minutes
                   </span>
                 </div>
+                <div className="flex justify-between text-slate-900 font-bold text-base pt-2 border-t border-slate-100">
+                  <span>Total Expected Bill</span>
+                  <span className="text-emerald-600">₦{totalAmount.toLocaleString()}</span>
+                </div>
               </div>
-              <div className="text-right flex items-center gap-4">
-                <span className="font-bold text-slate-900">
-                  ₦{(item.price * item.quantity).toLocaleString()}
-                </span>
-                <button type="button" className="text-slate-400 hover:text-red-500 transition-colors">
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
 
-        {/* Order Summary Box */}
-        <div className="restaurant-card p-5 space-y-4 bg-white">
-          <h2 className="font-bold text-slate-900 border-b border-slate-100 pb-3">Summary & Estimated Wait</h2>
-          
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between text-slate-600">
-              <span>Maximum Expected Preparation Time</span>
-              <span className="font-semibold text-emerald-600 flex items-center gap-1">
-                <Clock className="w-4 h-4" /> {maxWaitTime} Minutes
-              </span>
+              <button
+                type="button"
+                disabled={isSubmitting}
+                onClick={handleCheckoutSubmit}
+                className="w-full mt-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle className="w-5 h-5" />
+                <span>{isSubmitting ? 'Saving to Database...' : 'Submit Multi-Item Order'}</span>
+              </button>
             </div>
-            <div className="flex justify-between text-slate-900 font-bold text-base pt-2 border-t border-slate-100">
-              <span>Total Expected Bill</span>
-              <span className="text-emerald-600">₦{totalAmount.toLocaleString()}</span>
-            </div>
-          </div>
-
-          <Link
-            href={`/tracking?order=ORD001&table=${tableId}&session=${sessionId}`}
-            className="w-full mt-4 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-3 px-4 rounded-xl shadow-md transition-all duration-200"
-          >
-            <CheckCircle className="w-5 h-5" />
-            <span>Submit Multi-Item Order</span>
-          </Link>
-        </div>
+          </>
+        )}
       </main>
     </div>
+  );
+}
+
+export default function CartPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-slate-400 text-sm">Loading cart...</div>}>
+      <CartContent />
+    </Suspense>
   );
 }

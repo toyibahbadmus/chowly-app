@@ -1,3 +1,4 @@
+'use client'
 import Link from 'next/link';
 import { ArrowLeft, MessageSquareWarning, Star, Send } from 'lucide-react';
 
